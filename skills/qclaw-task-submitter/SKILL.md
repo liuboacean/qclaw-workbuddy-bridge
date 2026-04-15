@@ -26,6 +26,8 @@ version: 1.0.0
 python3 ~/.workbuddy/skills/qclaw-workbuddy-bridge/scripts/qclaw_queue.py add "任务描述" [--intent "用户原始意图"] [--ctx '{"key": "value"}']
 ```
 
+**注意**：`add` 命令会自动发送触发信号（`.trigger` 文件），WorkBuddy 收到信号后会**立即**处理，无需等待轮询间隔。
+
 ## 示例场景
 
 ### 场景 1：生成文档/报告
@@ -53,7 +55,7 @@ python3 ~/.workbuddy/skills/qclaw-workbuddy-bridge/scripts/qclaw_queue.py add "�
 ```
 ✅ 任务已提交给 WorkBuddy 执行
 🆔 任务编号: <task_id>
-⏱ 预计处理时间: 5-30 分钟（取决于任务复杂度）
+⏱ 预计处理时间: 1-5 分钟（触发式响应，极速）
 📋 任务内容: <任务描述>
 
 WorkBuddy 执行完成后会通过以下渠道通知您结果。

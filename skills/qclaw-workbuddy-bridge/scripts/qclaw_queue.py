@@ -25,8 +25,16 @@ QUEUE_FILE_LOCK = os.path.join(QUEUE_DIR, "qclaw_tasks.lock")
 
 TZ_OFFSET = 8  # 北京时间
 
+TRIGGER_FILE = os.path.join(QUEUE_DIR, ".trigger")
+
 def beijing_now():
     return datetime.now(timezone(timedelta(hours=TZ_OFFSET)))
+
+def _write_trigger():
+    """写触发文件，唤醒 WorkBuddy"""
+    os.makedirs(QUEUE_DIR, exist_ok=True)
+    with open(TRIGGER_FILE, "w", encoding="utf-8") as f:
+        json.dump({"fired_at": beijing_now().isoformat()}, f, ensure_ascii=False)
 
 def ensure_queue():
     os.makedirs(QUEUE_DIR, exist_ok=True)
@@ -62,6 +70,8 @@ def cmd_add(args):
     data = read_queue()
     data["tasks"].insert(0, task)  # 新任务放最前
     write_queue(data)
+    # 写触发文件，唤醒 WorkBuddy
+    _write_trigger()
     print(f"✅ 任务已入队 [{task['id']}]: {args.description}")
     print(f"   队列位置: {QUEUE_FILE}")
     return task["id"]
@@ -180,6 +190,31 @@ def cmd_status(args):
     print(f"❌ 未找到任务: {args.task_id}", file=sys.stderr)
     sys.exit(1)
 
+def cmd_trigger(args):
+    """发送触发信号给 WorkBuddy（主动唤醒，不等待轮询）"""
+    _write_trigger()
+    print(f"🔔 触发信号已发送，WorkBuddy 将在下次调度时立即处理任务")
+
+def cmd_watch(args):
+    """阻塞式监听：等待触发信号到达后处理 pending 任务（用于触发式自动化）"""
+    seen = set()
+    print(f"👁  监听触发信号文件: {TRIGGER_FILE}（按 Ctrl+C 退出）")
+    while True:
+        if os.path.exists(TRIGGER_FILE):
+            os.remove(TRIGGER_FILE)
+            print(f"\n🔔 收到触发信号，开始处理 pending 任务...")
+            data = read_queue()
+            pending = [t for t in data.get("tasks", [])
+                       if t["status"] == "pending" and t["id"] not in seen]
+            if not pending:
+                print("   队列为空，跳过")
+                continue
+            for t in pending:
+                seen.add(t["id"])
+                print(json.dumps(t, ensure_ascii=False))
+            return  # 只处理一轮，不持续监听
+        time.sleep(5)
+
 # ── main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -213,6 +248,9 @@ if __name__ == "__main__":
     p_st.add_argument("task_id", help="任务 ID")
     p_st.add_argument("new_status", choices=["pending", "processing", "done", "error"])
 
+    sub.add_parser("trigger", help="发送触发信号给 WorkBuddy（主动唤醒）")
+    sub.add_parser("watch", help="阻塞监听触发信号，收到后处理 pending 任务")
+
     args = parser.parse_args()
 
     if args.cmd == "add":
@@ -229,5 +267,9 @@ if __name__ == "__main__":
         cmd_error(args)
     elif args.cmd == "status":
         cmd_status(args)
+    elif args.cmd == "trigger":
+        cmd_trigger(args)
+    elif args.cmd == "watch":
+        cmd_watch(args)
     else:
         parser.print_help()
