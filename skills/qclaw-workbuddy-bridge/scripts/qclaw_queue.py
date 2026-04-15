@@ -196,24 +196,35 @@ def cmd_trigger(args):
     print(f"🔔 触发信号已发送，WorkBuddy 将在下次调度时立即处理任务")
 
 def cmd_watch(args):
-    """阻塞式监听：等待触发信号到达后处理 pending 任务（用于触发式自动化）"""
+    """阻塞式监听：等待触发信号到达后处理 pending 任务"""
     seen = set()
-    print(f"👁  监听触发信号文件: {TRIGGER_FILE}（按 Ctrl+C 退出）")
-    while True:
-        if os.path.exists(TRIGGER_FILE):
-            os.remove(TRIGGER_FILE)
-            print(f"\n🔔 收到触发信号，开始处理 pending 任务...")
-            data = read_queue()
-            pending = [t for t in data.get("tasks", [])
-                       if t["status"] == "pending" and t["id"] not in seen]
-            if not pending:
-                print("   队列为空，跳过")
-                continue
-            for t in pending:
-                seen.add(t["id"])
-                print(json.dumps(t, ensure_ascii=False))
-            return  # 只处理一轮，不持续监听
-        time.sleep(5)
+    once = getattr(args, "once", False)
+
+    if once:
+        # launchd / 完全无轮询模式：检查一次，有信号处理，无信号直接退出
+        if not os.path.exists(TRIGGER_FILE):
+            return  # 无信号，直接退出，不浪费任何资源
+        print(f"🔔 收到触发信号（launchd），处理 pending 任务...")
+    else:
+        print(f"👁  监听触发信号文件: {TRIGGER_FILE}（按 Ctrl+C 退出）")
+        while True:
+            if os.path.exists(TRIGGER_FILE):
+                print(f"\n🔔 收到触发信号，开始处理 pending 任务...")
+                break
+            time.sleep(5)
+        seen = set()  # 重置 seen，确保每次手动启动都处理所有 pending
+
+    os.remove(TRIGGER_FILE)
+    data = read_queue()
+    pending = [t for t in data.get("tasks", [])
+               if t["status"] == "pending" and t["id"] not in seen]
+    if not pending:
+        print("   队列为空，跳过")
+        return
+    for t in pending:
+        seen.add(t["id"])
+        print(json.dumps(t, ensure_ascii=False))
+    print("✅ 本轮处理完成，等待下一次触发信号...")
 
 # ── main ──────────────────────────────────────────────────────────────────────
 
@@ -249,7 +260,9 @@ if __name__ == "__main__":
     p_st.add_argument("new_status", choices=["pending", "processing", "done", "error"])
 
     sub.add_parser("trigger", help="发送触发信号给 WorkBuddy（主动唤醒）")
-    sub.add_parser("watch", help="阻塞监听触发信号，收到后处理 pending 任务")
+    p_watch = sub.add_parser("watch", help="阻塞监听触发信号，收到后处理 pending 任务")
+    p_watch.add_argument("--once", action="store_true",
+                         help="单次检查后退出（用于 launchd 等事件驱动场景，完全不轮询）")
 
     args = parser.parse_args()
 

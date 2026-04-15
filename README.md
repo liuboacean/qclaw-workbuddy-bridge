@@ -93,3 +93,37 @@ qclaw-workbuddy-bridge/
 - **SkillHub**: skillhub.cloud.tencent.com/skills/qclaw-workbuddy-bridge
 - **版本**: v1.0.0
 - **作者**: liuboacean
+
+## 完全无轮询模式（launchd，推荐）
+
+通过 macOS launchd 监听触发文件，**零 Token 消耗，文件出现即执行**。
+
+### 安装 launchd Agent
+
+```bash
+# 安装 agent（自动安装）
+launchctl load ~/Library/LaunchAgents/com.liubo.qclaw-bridge.plist
+
+# 确认运行状态
+launchctl list | grep qclaw-bridge
+```
+
+### 工作原理
+
+```
+QClaw 提交任务 → add 命令写 .trigger 文件
+                           ↓
+              launchd 检测到文件 → 触发 watch --once
+                           ↓
+              qclaw_queue.py 处理 pending 任务
+                           ↓
+              任务 done 后删除 .trigger → 等待下一轮
+```
+
+**零轮询，完全事件驱动**。
+
+### 卸载
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.liubo.qclaw-bridge.plist
+```
