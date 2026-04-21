@@ -1,5 +1,10 @@
 # QClaw ↔ WorkBuddy 任务分发桥
 
+[![GitHub stars](https://img.shields.io/github/stars/liuboacean/qclaw-workbuddy-bridge?style=social)](https://github.com/liuboacean/qclaw-workbuddy-bridge/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/liuboacean/qclaw-workbuddy-bridge?style=social)](https://github.com/liuboacean/qclaw-workbuddy-bridge/network/members)
+[![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+
 通过共享 JSON 队列 + macOS launchd 事件驱动，实现 **QClaw（微信入口）** 和 **WorkBuddy（执行引擎）** 的双向打通。**零轮询、零 Token 浪费**。
 
 > 用户在微信/QClaw 提交复杂任务 → WorkBuddy 自动执行 → 结果推送回微信
